@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://hyphenconnect.onrender.com/api/v1",
+  baseURL: "https://fhdepotserver.onrender.com/api/v1",
 });
 
 export const signUp = async (payload: any) => {
