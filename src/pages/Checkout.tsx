@@ -287,7 +287,10 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
           ? "/shopper-portal/verify-payment"
           : "/wholesale-portal/verify-payment"
         : "/verify-payment";
-      const callback_url = `${window.location.origin}${callbackPath}`;
+      const origin = window.location.hostname.includes("hyphenconnect.ai")
+        ? "https://fh-depot-user.vercel.app"
+        : window.location.origin;
+      const callback_url = `${origin}${callbackPath}`;
 
       const payload = {
         amount: Math.ceil(Number(total)),
