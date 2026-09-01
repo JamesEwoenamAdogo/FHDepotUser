@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Loader2, Download } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -33,6 +33,7 @@ const VerifyPayment = () => {
     "loading",
   );
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { clearCart } = useCart();
   const hasRun = useRef(false);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -50,8 +51,14 @@ const VerifyPayment = () => {
 
     const checkPayment = async () => {
       hasRun.current = true;
-      const ref = localStorage.getItem("reference");
+      const urlRef = searchParams.get("reference") || searchParams.get("trxref");
+      const storedRef = localStorage.getItem("reference");
+      const ref = urlRef || storedRef;
       const storedOrder = localStorage.getItem("order");
+
+      if (urlRef) {
+        localStorage.setItem("reference", urlRef);
+      }
 
       if (!ref) {
         setStatus("error");
@@ -72,23 +79,29 @@ const VerifyPayment = () => {
       }
 
       try {
-        const response = await verifyPayment(ref);
-
-        const isVerified =
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        let response = await verifyPayment(ref);
+        let isVerified =
           response?.data?.success ||
           response?.data?.data?.success ||
           response?.data?.status === true ||
           response?.data?.status === "success";
+
+        for (let attempt = 0; attempt < 4 && !isVerified; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          response = await verifyPayment(ref);
+          isVerified =
+            response?.data?.success ||
+            response?.data?.data?.success ||
+            response?.data?.status === true ||
+            response?.data?.status === "success";
+        }
 
         if (isVerified) {
           setStatus("success");
           clearCart();
           localStorage.removeItem("reference");
         } else if (storedOrder) {
-          // Paystack only redirects here after the user has paid.
-          // For guest (non-logged-in) orders the verify endpoint may not
-          // recognise the reference, so fall back to showing the receipt
-          // + QR using the order data we stored at checkout.
           setStatus("success");
           clearCart();
           localStorage.removeItem("reference");
@@ -108,7 +121,7 @@ const VerifyPayment = () => {
     };
 
     checkPayment();
-  }, [clearCart]);
+  }, [clearCart, searchParams]);
 
   const handleDownloadPDF = async () => {
     if (!receiptRef.current) return;
