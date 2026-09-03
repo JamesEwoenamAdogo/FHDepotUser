@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   Search,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Filter,
   ShoppingCart,
   Package,
@@ -71,6 +73,52 @@ const inferImage = (name: string): string => {
   return DEFAULT_IMAGE;
 };
 
+const CACHE_KEY = "shopProductCache_v2";
+const PAGE_SIZE = 6;
+
+type CachedPage = { items: any[]; totalPages: number };
+
+const mapApiProduct = (p: any) => ({
+  id: p.id,
+  category: inferCategory(p.name),
+  name: p.name,
+  price: p.list_price || 0,
+  stock: p.qty_available || 0,
+  image: p.image || inferImage(p.name),
+});
+
+const readTotalPages = (payload: any, page: number, itemCount: number) => {
+  const meta = payload?.pagination || payload || {};
+  const total =
+    meta.totalPages ||
+    payload?.totalPages ||
+    payload?.total_pages ||
+    payload?.pages;
+  if (total) return Math.max(1, Number(total));
+  if (meta.hasNext) return page + 1;
+  if (itemCount >= PAGE_SIZE) return page + 1;
+  return page;
+};
+
+const readStoredCache = (): Record<string, CachedPage> => {
+  try {
+    const stored = localStorage.getItem(CACHE_KEY);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored);
+    const next: Record<string, CachedPage> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (Array.isArray(value)) {
+        next[key] = { items: value, totalPages: 1 };
+      } else if (value && Array.isArray((value as CachedPage).items)) {
+        next[key] = value as CachedPage;
+      }
+    }
+    return next;
+  } catch {
+    return {};
+  }
+};
+
 const Shop = () => {
   const { addItem, items } = useCart();
   const [searchParams] = useSearchParams();
@@ -99,86 +147,74 @@ const Shop = () => {
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
-  const pageCache = useRef<Record<string, any[]>>({});
+  const pageCache = useRef<Record<string, CachedPage>>(readStoredCache());
 
-  // Persist cache to localStorage so repeat visits are instant even after refresh
-  const CACHE_KEY = "shopProductCache";
-  const loadCache = () => {
-    try {
-      const stored = localStorage.getItem(CACHE_KEY);
-      if (stored) {
-        pageCache.current = JSON.parse(stored);
-      }
-    } catch {
-      pageCache.current = {};
-    }
-  };
   const saveCache = () => {
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(pageCache.current));
     } catch {}
   };
-  loadCache();
+
+  const applyProducts = (
+    key: string | number,
+    items: any[],
+    pages: number,
+  ) => {
+    const total = Math.max(1, pages);
+    pageCache.current[String(key)] = { items, totalPages: total };
+    saveCache();
+    setAllProducts(items);
+    setTotalPages(total);
+  };
 
   const fetchProducts = async (page: number, background = false) => {
-    // Return cached data instantly if available (stale-while-revalidate)
-    if (pageCache.current[page]) {
-      setAllProducts(pageCache.current[page]);
+    const cached = pageCache.current[String(page)];
+    if (cached?.items) {
+      setAllProducts(cached.items);
+      if (cached.totalPages > 1) setTotalPages(cached.totalPages);
       setIsLoading(false);
-      if (!background) return;
     } else if (!background) {
       setIsLoading(true);
     }
     try {
       const response = await getAllProducts(page);
       if (response?.data?.data) {
-        const apiProducts = response.data.data.map((p: any) => ({
-          id: p.id,
-          category: inferCategory(p.name),
-          name: p.name,
-          price: p.list_price || 0,
-          stock: p.qty_available || 0,
-          image: p.image || inferImage(p.name),
-        }));
-        pageCache.current[page] = apiProducts; // Cache for instant re-visits
-        saveCache();
-        setAllProducts(apiProducts);
-        // Infer total pages from response if available, otherwise assume more pages exist
-        const total =
-          response.data.totalPages ||
-          response.data.total_pages ||
-          response.data.pages;
-        setTotalPages(
-          total
-            ? Number(total)
-            : apiProducts.length > 0
-              ? currentPage + 1
-              : currentPage,
+        const apiProducts = response.data.data.map(mapApiProduct);
+        applyProducts(
+          page,
+          apiProducts,
+          readTotalPages(response.data, page, apiProducts.length),
         );
       }
     } catch (error) {
       console.error("Failed to fetch products", error);
-      if (!pageCache.current[page]) toast.error("Failed to load products");
+      if (!pageCache.current[String(page)]) toast.error("Failed to load products");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Prefetch next page in the background for faster navigation
   const prefetchNextPage = (page: number) => {
-    if (pageCache.current[page] || page < 1) return;
+    if (pageCache.current[String(page)] || page < 1) return;
     getAllProducts(page)
       .then((response) => {
         if (response?.data?.data) {
-          pageCache.current[page] = response.data.data.map((p: any) => ({
-            id: p.id,
-            category: inferCategory(p.name),
-            name: p.name,
-            price: p.list_price || 0,
-            stock: p.qty_available || 0,
-            image: p.image || inferImage(p.name),
-          }));
+          const apiProducts = response.data.data.map(mapApiProduct);
+          pageCache.current[String(page)] = {
+            items: apiProducts,
+            totalPages: readTotalPages(
+              response.data,
+              page,
+              apiProducts.length,
+            ),
+          };
           saveCache();
+          setTotalPages((prev) =>
+            Math.max(
+              prev,
+              pageCache.current[String(page)]?.totalPages || prev,
+            ),
+          );
         }
       })
       .catch(() => {});
@@ -186,36 +222,22 @@ const Shop = () => {
 
   const fetchSearchProducts = async (query: string, page: number) => {
     const cacheKey = `search-${query}-${page}`;
-    if (pageCache.current[cacheKey]) {
-      setAllProducts(pageCache.current[cacheKey]);
+    const cached = pageCache.current[cacheKey];
+    if (cached?.items) {
+      setAllProducts(cached.items);
+      if (cached.totalPages > 1) setTotalPages(cached.totalPages);
       setIsLoading(false);
-      return;
+    } else {
+      setIsLoading(true);
     }
-    setIsLoading(true);
     try {
       const response = await searchProducts(query, page);
       if (response?.data?.data) {
-        const apiProducts = response.data.data.map((p: any) => ({
-          id: p.id,
-          category: inferCategory(p.name),
-          name: p.name,
-          price: p.list_price || 0,
-          stock: p.qty_available || 0,
-          image: p.image || inferImage(p.name),
-        }));
-        pageCache.current[cacheKey] = apiProducts;
-        saveCache();
-        setAllProducts(apiProducts);
-        const total =
-          response.data.totalPages ||
-          response.data.total_pages ||
-          response.data.pages;
-        setTotalPages(
-          total
-            ? Number(total)
-            : apiProducts.length > 0
-              ? currentPage + 1
-              : currentPage,
+        const apiProducts = response.data.data.map(mapApiProduct);
+        applyProducts(
+          cacheKey,
+          apiProducts,
+          readTotalPages(response.data, page, apiProducts.length),
         );
       } else {
         setAllProducts([]);
@@ -643,16 +665,17 @@ const Shop = () => {
               </div>
             )}
 
-            {/* Pagination */}
+            {/* Pagination — shown whenever there is more than one page of products */}
             {totalPages > 1 && (
-              <div className="flex justify-center mt-12 gap-2">
+              <div className="flex flex-wrap justify-center items-center mt-12 gap-2">
                 <button
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className="h-10 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
                 >
+                  <ChevronLeft className="w-4 h-4" />
                   Previous
                 </button>
 
@@ -686,9 +709,10 @@ const Shop = () => {
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className="h-10 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="h-10 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
                 >
                   Next
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             )}
