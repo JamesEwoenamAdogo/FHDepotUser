@@ -186,7 +186,7 @@ export const WholesalerLayout = () => {
           </div>
         </header>
 
-        <div className="p-6 lg:p-8 flex-1 overflow-y-auto">
+        <div className="p-3 sm:p-6 lg:p-8 flex-1 overflow-y-auto">
           <Outlet context={{ setIsShopOpen }} />
         </div>
       </main>

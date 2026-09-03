@@ -8,11 +8,12 @@ import { useCart } from "@/context/CartContext";
 import { toast } from "sonner";
 
 import { useNavigate } from "react-router-dom";
-import { MapPin, Eye, Download, RotateCcw } from "lucide-react";
+import { Download, RotateCcw } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { QRCodeSVG } from "qrcode.react";
 import { useRef } from "react";
+import { OrderHistoryList } from "@/components/orders/OrderHistoryList";
 
 export const ShopperHistory = () => {
   const navigate = useNavigate();
@@ -172,11 +173,11 @@ export const ShopperHistory = () => {
     : "";
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
         <h2 className="text-xl font-bold text-fh-navy">Order History</h2>
         <select
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fh-orange"
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fh-orange w-full sm:w-auto"
           value={dateFilter}
           onChange={(e) => setDateFilter(e.target.value)}
         >
@@ -185,101 +186,13 @@ export const ShopperHistory = () => {
           <option value="year">This Year</option>
         </select>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 text-gray-500 text-sm border-y border-gray-100">
-              <th className="p-4 font-medium">Order ID</th>
-              <th className="p-4 font-medium">Date Ordered</th>
-              <th className="p-4 font-medium">Products</th>
-              <th className="p-4 font-medium">Total</th>
-              <th className="p-4 font-medium">Receipt</th>
-              <th className="p-4 font-medium text-right">Details</th>
-              <th className="p-4 font-medium text-right">Reorder</th>
-              <th className="p-4 font-medium text-right">Track</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {filteredOrders.length > 0 ? (
-              filteredOrders.map((order, i) => (
-                <tr
-                  key={i}
-                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="p-4">
-                    <p className="font-medium text-fh-navy">{order.id}</p>
-                  </td>
-                  <td className="p-4 text-gray-600">
-                    {new Date(order.date).toLocaleDateString() ===
-                    "Invalid Date"
-                      ? order.date
-                      : new Date(order.date).toLocaleDateString()}
-                  </td>
-                  <td
-                    className="p-4 text-gray-600 max-w-[250px] truncate"
-                    title={order.items
-                      ?.map((item: any) => item.name)
-                      .join(", ")}
-                  >
-                    {order.items?.map((item: any) => item.name).join(", ")}
-                  </td>
-                  <td className="p-4 font-medium text-fh-navy">
-                    GHS {order.total.toLocaleString()}
-                  </td>
-                  <td className="p-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      onClick={() => handleViewReceipt(order)}
-                    >
-                      Receipt
-                    </Button>
-                  </td>
-                  <td className="p-4 text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setSelectedDetails(order)}
-                    >
-                      <Eye className="w-4 h-4 text-fh-navy" />
-                    </Button>
-                  </td>
-                  <td className="p-4 text-right">
-                    <Button
-                      size="sm"
-                      className="h-8 text-xs bg-fh-navy hover:bg-fh-navyHover text-white"
-                      onClick={() => handleReorder(order)}
-                    >
-                      <RotateCcw className="w-3 h-3 mr-1" /> Reorder
-                    </Button>
-                  </td>
-                  <td className="p-4 text-right">
-                    {(order.deliveryPreference || "").toLowerCase() !==
-                      "pickup" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs border-fh-orange text-fh-orange hover:bg-fh-orange hover:text-white"
-                        onClick={() => handleTrackOrder(order)}
-                      >
-                        <MapPin className="w-3 h-3 mr-1" /> Track
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={8} className="p-4 text-center text-gray-500">
-                  No orders found for this period.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <OrderHistoryList
+        orders={filteredOrders}
+        onReceipt={handleViewReceipt}
+        onDetails={setSelectedDetails}
+        onReorder={handleReorder}
+        onTrack={handleTrackOrder}
+      />
 
       {/* Receipt Modal */}
       <Dialog
