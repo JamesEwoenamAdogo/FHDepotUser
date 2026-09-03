@@ -4,7 +4,7 @@ import {
   Search,
   ChevronDown,
   ChevronLeft,
-  ChevronRight,
+  ChevronRight, 
   Filter,
   ShoppingCart,
   Package,
