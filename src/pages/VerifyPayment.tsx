@@ -7,6 +7,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { verifyPayment } from "@/lib/Api";
 import { useCart } from "@/context/CartContext";
+import { formatDeliveryAddress } from "@/lib/address";
 
 interface StoredOrder {
   id?: string;
@@ -18,6 +19,7 @@ interface StoredOrder {
   address?: string;
   city?: string;
   region?: string;
+  landmark?: string;
   deliveryPreference?: string;
   pickupDateTime?: string;
   orders?: Array<{ name: string; price: number; quantity: number }>;
@@ -138,12 +140,7 @@ const VerifyPayment = () => {
         customerName: `${order.firstName || ""} ${order.lastName || ""}`.trim(),
         email: order.email || "N/A",
         phone: order.phone || "N/A",
-        address:
-          order.deliveryPreference === "delivery"
-            ? `${order.address || ""}, ${order.city || ""}, ${order.region || ""}`
-                .replace(/^,\s*/, "")
-                .replace(/,\s*$/, "")
-            : "Pickup",
+        address: formatDeliveryAddress(order),
         pickupDateTime: order.pickupDateTime || "N/A",
         preference: order.deliveryPreference || "N/A",
         items: order.orders || [],

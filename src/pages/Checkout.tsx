@@ -85,6 +85,7 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
       email: storedEmail,
       phone: storedPhone,
       address: "",
+      landmark: "",
       city: "",
       region: "",
       lon: 0,
@@ -199,6 +200,7 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
       if (deliveryPreference === "delivery" && formData.address) {
         const newAddress = {
           address: formData.address,
+          landmark: formData.landmark?.trim() || "",
           city: formData.city,
           region: formData.region,
           lon: formData.lon,
@@ -224,6 +226,7 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
         id: storedId || generatedId,
         orderNumber: generatedId,
         ...formData,
+        landmark: formData.landmark?.trim() || "",
         deliveryPreference,
         pickupDateTime:
           deliveryPreference === "pickup" && pickupDateTime
@@ -251,6 +254,7 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
           phone: formData.phone,
           ...(deliveryPreference === "delivery" && {
             full_address: formData.address,
+            landmark: formData.landmark?.trim() || "",
             city: formData.city,
             state: formData.region,
           }),
@@ -263,6 +267,7 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
           phone: "Phone",
           ...(deliveryPreference === "delivery" && {
             full_address: "Address",
+            landmark: "Landmark",
             city: "City",
             state: "Region",
           }),
@@ -468,6 +473,7 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
                                 setFormData((prev) => ({
                                   ...prev,
                                   address: addr.address,
+                                  landmark: addr.landmark || "",
                                   city: addr.city,
                                   region: addr.region,
                                   lon: addr.lon || prev.lon,
@@ -526,6 +532,21 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
                           ))}
                         </div>
                       )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="landmark">
+                        Landmark{" "}
+                        <span className="text-gray-400 font-normal">
+                          (optional)
+                        </span>
+                      </Label>
+                      <Input
+                        id="landmark"
+                        value={formData.landmark}
+                        onChange={handleInputChange}
+                        placeholder="e.g. Opposite the Goil station, blue gate"
+                        className="bg-fh-gray/30 border-gray-200 focus-visible:ring-fh-orange"
+                      />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">

@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MapPin, Eye, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getAllOrders } from "@/lib/Api";
+import { formatDeliveryAddress } from "@/lib/address";
 
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -39,7 +40,8 @@ export const WholesalerHistory = () => {
               lng: parseFloat(
                 o.location?.lon || o.location?.lng || o.lon || "0",
               ),
-              address: o.address,
+              address: formatDeliveryAddress(o),
+              landmark: o.landmark,
               customerName: `${o.firstName} ${o.lastName}`,
               deliveryPreference: o.deliveryPreference || "delivery",
             }),
@@ -118,12 +120,7 @@ export const WholesalerHistory = () => {
           `${selectedReceipt.firstName || ""} ${selectedReceipt.lastName || ""}`.trim(),
         email: selectedReceipt.email || "N/A",
         phone: selectedReceipt.phone || selectedReceipt.customerPhone || "N/A",
-        address:
-          selectedReceipt.deliveryPreference === "delivery"
-            ? `${selectedReceipt.address || ""}, ${selectedReceipt.city || ""}, ${selectedReceipt.region || ""}`
-                .replace(/^,\s*/, "")
-                .replace(/,\s*$/, "")
-            : "Pickup",
+        address: formatDeliveryAddress(selectedReceipt),
         pickupDateTime: selectedReceipt.pickupDateTime || "N/A",
         preference: selectedReceipt.deliveryPreference || "N/A",
         items: selectedReceipt.items || selectedReceipt.orders || [],

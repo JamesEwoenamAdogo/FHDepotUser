@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { getAllOrders } from "@/lib/Api";
+import { formatDeliveryAddress } from "@/lib/address";
 
 export const WholesalerDashboard = () => {
   const { setIsShopOpen } = useOutletContext<{
@@ -41,7 +42,8 @@ export const WholesalerDashboard = () => {
               lng: parseFloat(
                 o.location?.lon || o.location?.lng || o.lon || "0",
               ),
-              address: o.address,
+              address: formatDeliveryAddress(o),
+              landmark: o.landmark,
               customerName: `${o.firstName} ${o.lastName}`,
               deliveryPreference: o.deliveryPreference || "delivery",
             }),

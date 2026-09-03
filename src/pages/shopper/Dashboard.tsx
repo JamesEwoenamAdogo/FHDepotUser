@@ -3,6 +3,7 @@ import { Package, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { getAllOrders } from "@/lib/Api";
+import { formatDeliveryAddress } from "@/lib/address";
 
 export const ShopperDashboard = () => {
   const { setIsShopOpen } = useOutletContext<{
@@ -31,7 +32,8 @@ export const ShopperDashboard = () => {
               status: o.status || "In Transit",
               items: o.orders,
               location: o.location,
-              address: o.address,
+              address: formatDeliveryAddress(o),
+              landmark: o.landmark,
               customerName: `${o.firstName} ${o.lastName}`,
               deliveryPreference: o.deliveryPreference || "delivery",
             }),
