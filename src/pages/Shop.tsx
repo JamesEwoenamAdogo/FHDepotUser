@@ -6,7 +6,7 @@ import {
   ChevronLeft,
   ChevronRight, 
   Filter,
-  ShoppingCart,
+  ShoppingCart, 
   Package,
   X,
 } from "lucide-react";
