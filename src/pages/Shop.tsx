@@ -73,8 +73,8 @@ const inferImage = (name: string): string => {
   return DEFAULT_IMAGE;
 };
 
-const CACHE_KEY = "shopProductCache_v2";
-const PAGE_SIZE = 6;
+const CACHE_KEY = "shopProductCache_v3";
+const PAGE_SIZE = 8;
 
 type CachedPage = { items: any[]; totalPages: number };
 
@@ -89,15 +89,22 @@ const mapApiProduct = (p: any) => ({
 
 const readTotalPages = (payload: any, page: number, itemCount: number) => {
   const meta = payload?.pagination || payload || {};
-  const total =
+  const limit = Number(meta.limit) || PAGE_SIZE;
+  const reported = Number(
     meta.totalPages ||
-    payload?.totalPages ||
-    payload?.total_pages ||
-    payload?.pages;
-  if (total) return Math.max(1, Number(total));
-  if (meta.hasNext) return page + 1;
-  if (itemCount >= PAGE_SIZE) return page + 1;
-  return page;
+      payload?.totalPages ||
+      payload?.total_pages ||
+      payload?.pages ||
+      0,
+  );
+  let totalPages = reported > 0 ? reported : page;
+  if (meta.hasNext === false) {
+    return Math.max(1, reported || page);
+  }
+  if ((meta.hasNext === true || itemCount >= limit) && totalPages <= page) {
+    totalPages = page + 1;
+  }
+  return Math.max(1, totalPages);
 };
 
 const readStoredCache = (): Record<string, CachedPage> => {
@@ -120,7 +127,7 @@ const readStoredCache = (): Record<string, CachedPage> => {
 };
 
 const Shop = () => {
-  const { addItem, items } = useCart();
+  const { addItem } = useCart();
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get("category");
   const mappedInitialCategory =
@@ -169,7 +176,7 @@ const Shop = () => {
 
   const fetchProducts = async (page: number, background = false) => {
     const cached = pageCache.current[String(page)];
-    if (cached?.items) {
+    if (cached?.items?.length) {
       setAllProducts(cached.items);
       if (cached.totalPages > 1) setTotalPages(cached.totalPages);
       setIsLoading(false);
@@ -178,8 +185,13 @@ const Shop = () => {
     }
     try {
       const response = await getAllProducts(page);
+      const apiProducts = (response?.data?.data || []).map(mapApiProduct);
+      if (apiProducts.length === 0 && page > 1) {
+        setTotalPages(page - 1);
+        setCurrentPage((prev) => Math.max(1, prev - 1));
+        return;
+      }
       if (response?.data?.data) {
-        const apiProducts = response.data.data.map(mapApiProduct);
         applyProducts(
           page,
           apiProducts,
@@ -198,7 +210,7 @@ const Shop = () => {
     if (pageCache.current[String(page)] || page < 1) return;
     getAllProducts(page)
       .then((response) => {
-        if (response?.data?.data) {
+        if (response?.data?.data?.length) {
           const apiProducts = response.data.data.map(mapApiProduct);
           pageCache.current[String(page)] = {
             items: apiProducts,
@@ -223,7 +235,7 @@ const Shop = () => {
   const fetchSearchProducts = async (query: string, page: number) => {
     const cacheKey = `search-${query}-${page}`;
     const cached = pageCache.current[cacheKey];
-    if (cached?.items) {
+    if (cached?.items?.length) {
       setAllProducts(cached.items);
       if (cached.totalPages > 1) setTotalPages(cached.totalPages);
       setIsLoading(false);
@@ -232,8 +244,13 @@ const Shop = () => {
     }
     try {
       const response = await searchProducts(query, page);
+      const apiProducts = (response?.data?.data || []).map(mapApiProduct);
+      if (apiProducts.length === 0 && page > 1) {
+        setTotalPages(page - 1);
+        setCurrentPage((prev) => Math.max(1, prev - 1));
+        return;
+      }
       if (response?.data?.data) {
-        const apiProducts = response.data.data.map(mapApiProduct);
         applyProducts(
           cacheKey,
           apiProducts,
@@ -314,7 +331,7 @@ const Shop = () => {
   const currentProducts = products;
 
   return (
-    <div className="min-h-screen bg-fh-gray pt-12 pb-24">
+    <div className="min-h-screen bg-fh-gray pt-12 pb-32 md:pb-24">
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
@@ -429,7 +446,7 @@ const Shop = () => {
                   top: -window.innerHeight + 200,
                   bottom: 0,
                 }}
-                className="fixed bottom-4 left-4 z-50 w-72 rounded-lg p-0.5 shadow-[0_0_15px_rgba(234,179,8,0.3)] border border-yellow-300 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 animate-pulse-slow cursor-move"
+                className="fixed bottom-24 left-4 md:bottom-4 z-40 w-72 rounded-lg p-0.5 shadow-[0_0_15px_rgba(234,179,8,0.3)] border border-yellow-300 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 animate-pulse-slow cursor-move"
               >
                 <div className="bg-white/95 backdrop-blur-sm rounded-md p-3 relative pointer-events-auto">
                   <button
@@ -665,55 +682,64 @@ const Shop = () => {
               </div>
             )}
 
-            {/* Pagination — shown whenever there is more than one page of products */}
-            {totalPages > 1 && (
-              <div className="flex flex-wrap justify-center items-center mt-12 gap-2">
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="h-10 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
-                </button>
+            {/* Pagination stays visible on mobile as a fixed bar so 8 tall cards
+                and the best-sellers ribbon cannot hide Previous/Next. */}
+            {!isLoading && (allProducts.length > 0 || currentPage > 1) && (
+              <div className="fixed inset-x-0 bottom-0 z-50 md:static md:mt-12 md:bottom-auto">
+                <div className="flex justify-center items-center gap-2 bg-white/95 md:bg-transparent backdrop-blur md:backdrop-blur-none border-t md:border-0 border-gray-200 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.08)] md:shadow-none">
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="h-11 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span className="hidden sm:inline">Previous</span>
+                  </button>
 
-                {Array.from({
-                  length: Math.min(
-                    7,
-                    Math.max(
-                      0,
-                      totalPages - Math.floor((currentPage - 1) / 7) * 7,
-                    ),
-                  ),
-                }).map((_, i) => {
-                  const pageNum = Math.floor((currentPage - 1) / 7) * 7 + i + 1;
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`h-10 w-10 rounded-md text-sm font-medium transition-colors ${
-                        currentPage === pageNum
-                          ? "bg-fh-orange text-white border border-fh-orange"
-                          : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
+                  <div className="flex items-center gap-1 overflow-x-auto max-w-[50vw] md:max-w-none no-scrollbar">
+                    {Array.from({
+                      length: Math.min(
+                        7,
+                        Math.max(
+                          1,
+                          totalPages - Math.floor((currentPage - 1) / 7) * 7,
+                        ),
+                      ),
+                    }).map((_, i) => {
+                      const pageNum =
+                        Math.floor((currentPage - 1) / 7) * 7 + i + 1;
+                      if (pageNum > totalPages) return null;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`h-11 min-w-11 px-3 rounded-md text-sm font-medium transition-colors shrink-0 ${
+                            currentPage === pageNum
+                              ? "bg-fh-orange text-white border border-fh-orange"
+                              : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="h-10 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        Math.min(prev + 1, Math.max(totalPages, prev + 1)),
+                      )
+                    }
+                    disabled={currentPage >= totalPages}
+                    className="h-11 px-4 rounded-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
