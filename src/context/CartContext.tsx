@@ -8,12 +8,29 @@ export interface CartItem {
   image?: string;
 }
 
+export interface ReorderDraft {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  address: string;
+  landmark: string;
+  city: string;
+  region: string;
+  lat: number;
+  lon: number;
+  deliveryPreference: "delivery" | "pickup" | "";
+}
+
 interface CartContextType {
   items: CartItem[];
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
+  startReorder: (nextItems: CartItem[], draft: ReorderDraft) => void;
+  clearReorderDraft: () => void;
+  reorderDraft: ReorderDraft | null;
   cartCount: number;
   cartTotal: number;
   isCartOpen: boolean;
@@ -25,6 +42,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [items, setItems] = useState<CartItem[]>([]);
+  const [reorderDraft, setReorderDraft] = useState<ReorderDraft | null>(null);
 
   const addItem = (newItem: CartItem) => {
     setItems((prev) => {
@@ -50,7 +68,18 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
   };
 
-  const clearCart = () => setItems([]);
+  const clearCart = () => {
+    setItems([]);
+    setReorderDraft(null);
+  };
+
+  const startReorder = (nextItems: CartItem[], draft: ReorderDraft) => {
+    setItems(nextItems);
+    setReorderDraft(draft);
+    setIsCartOpen(true);
+  };
+
+  const clearReorderDraft = () => setReorderDraft(null);
 
   const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -75,6 +104,9 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         removeItem,
         updateQuantity,
         clearCart,
+        startReorder,
+        clearReorderDraft,
+        reorderDraft,
         cartCount,
         cartTotal,
         isCartOpen,

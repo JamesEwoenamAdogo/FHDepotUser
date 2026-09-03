@@ -3,9 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getAllOrders } from "@/lib/Api";
 import { formatDeliveryAddress } from "@/lib/address";
+import { toCartItems, toReorderDraft } from "@/lib/reorder";
+import { useCart } from "@/context/CartContext";
+import { toast } from "sonner";
 
 import { useNavigate } from "react-router-dom";
-import { MapPin, Eye, Download } from "lucide-react";
+import { MapPin, Eye, Download, RotateCcw } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { QRCodeSVG } from "qrcode.react";
@@ -13,6 +16,7 @@ import { useRef } from "react";
 
 export const ShopperHistory = () => {
   const navigate = useNavigate();
+  const { startReorder } = useCart();
   const [orders, setOrders] = useState<any[]>([]);
   const [dateFilter, setDateFilter] = useState("all");
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
@@ -41,7 +45,7 @@ export const ShopperHistory = () => {
               lng: parseFloat(
                 o.location?.lon || o.location?.lng || o.lon || "0",
               ),
-              address: formatDeliveryAddress(o),
+              address: o.address,
               landmark: o.landmark,
               customerName: `${o.firstName} ${o.lastName}`,
               deliveryPreference: o.deliveryPreference || "delivery",
@@ -80,6 +84,16 @@ export const ShopperHistory = () => {
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handleReorder = (order: any) => {
+    const cartItems = toCartItems(order);
+    if (cartItems.length === 0) {
+      toast.error("This order has no items to reorder.");
+      return;
+    }
+    startReorder(cartItems, toReorderDraft(order));
+    toast.success("Previous order added to your cart.");
   };
 
   const handleTrackOrder = (order: any) => {
@@ -181,6 +195,7 @@ export const ShopperHistory = () => {
               <th className="p-4 font-medium">Total</th>
               <th className="p-4 font-medium">Receipt</th>
               <th className="p-4 font-medium text-right">Details</th>
+              <th className="p-4 font-medium text-right">Reorder</th>
               <th className="p-4 font-medium text-right">Track</th>
             </tr>
           </thead>
@@ -232,6 +247,15 @@ export const ShopperHistory = () => {
                     </Button>
                   </td>
                   <td className="p-4 text-right">
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-fh-navy hover:bg-fh-navyHover text-white"
+                      onClick={() => handleReorder(order)}
+                    >
+                      <RotateCcw className="w-3 h-3 mr-1" /> Reorder
+                    </Button>
+                  </td>
+                  <td className="p-4 text-right">
                     {(order.deliveryPreference || "").toLowerCase() !==
                       "pickup" && (
                       <Button
@@ -248,7 +272,7 @@ export const ShopperHistory = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-gray-500">
+                <td colSpan={8} className="p-4 text-center text-gray-500">
                   No orders found for this period.
                 </td>
               </tr>
@@ -466,6 +490,15 @@ export const ShopperHistory = () => {
                 )}
               </div>
               <div className="mt-4">
+                <Button
+                  className="w-full mb-4 bg-fh-navy hover:bg-fh-navyHover text-white"
+                  onClick={() => {
+                    handleReorder(selectedDetails);
+                    setSelectedDetails(null);
+                  }}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" /> Reorder this order
+                </Button>
                 <p className="text-sm font-bold text-fh-navy mb-2">Items</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(selectedDetails.items || selectedDetails.orders || []).map(

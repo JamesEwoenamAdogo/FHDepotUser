@@ -49,7 +49,7 @@ interface CheckoutProps {
 }
 
 const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
-  const { items, cartTotal, cartCount, clearCart } = useCart();
+  const { items, cartTotal, cartCount, clearCart, reorderDraft } = useCart();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
@@ -121,6 +121,28 @@ const Checkout = ({ isModal = false, onClose }: CheckoutProps = {}) => {
       } catch (e) {}
     }
   }, []);
+
+  useEffect(() => {
+    if (!reorderDraft) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      firstName: reorderDraft.firstName || prev.firstName,
+      lastName: reorderDraft.lastName || prev.lastName,
+      email: reorderDraft.email || prev.email,
+      phone: reorderDraft.phone || prev.phone,
+      address: reorderDraft.address || prev.address,
+      landmark: reorderDraft.landmark || "",
+      city: reorderDraft.city || prev.city,
+      region: reorderDraft.region || prev.region,
+      lat: reorderDraft.lat || prev.lat,
+      lon: reorderDraft.lon || prev.lon,
+    }));
+
+    if (reorderDraft.deliveryPreference) {
+      setDeliveryPreference(reorderDraft.deliveryPreference);
+    }
+  }, [reorderDraft]);
 
   useEffect(() => {
     if (formData.address.length < 1) {

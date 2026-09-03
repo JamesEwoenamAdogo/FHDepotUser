@@ -12,6 +12,9 @@ import {
   Minus,
   Ticket,
   CheckCircle2,
+  MapPin,
+  User,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
@@ -38,6 +41,7 @@ export const CartSheet = ({ children }: { children: React.ReactNode }) => {
     cartTotal,
     isCartOpen,
     setIsCartOpen,
+    reorderDraft,
   } = useCart();
   const navigate = useNavigate();
 
@@ -252,6 +256,51 @@ export const CartSheet = ({ children }: { children: React.ReactNode }) => {
                   </div>
                 );
               })
+            )}
+
+            {reorderDraft && items.length > 0 && (
+              <div className="rounded-xl border border-orange-200 bg-white p-4 space-y-2 text-sm">
+                <p className="text-xs font-bold uppercase tracking-wide text-fh-orange">
+                  Previous order details
+                </p>
+                {(reorderDraft.firstName || reorderDraft.lastName) && (
+                  <p className="flex items-start gap-2 text-fh-navy">
+                    <User className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
+                    <span>
+                      {[reorderDraft.firstName, reorderDraft.lastName]
+                        .filter(Boolean)
+                        .join(" ")}
+                    </span>
+                  </p>
+                )}
+                {reorderDraft.phone && (
+                  <p className="flex items-start gap-2 text-fh-navy">
+                    <Phone className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
+                    <span>{reorderDraft.phone}</span>
+                  </p>
+                )}
+                {(reorderDraft.address ||
+                  reorderDraft.city ||
+                  reorderDraft.region) && (
+                  <p className="flex items-start gap-2 text-fh-navy">
+                    <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-gray-400" />
+                    <span>
+                      {[
+                        reorderDraft.address,
+                        reorderDraft.city,
+                        reorderDraft.region,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </p>
+                )}
+                {reorderDraft.landmark && (
+                  <p className="text-gray-600 pl-6">
+                    Landmark: {reorderDraft.landmark}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
